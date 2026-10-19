@@ -1,0 +1,15 @@
+{
+  "name": "receipts",
+  "description": "Receipts for AI coding agents: evidence of what changed and which checks really ran.",
+  "owner": {
+    "name": "Harshavardhan Sondakar",
+    "email": "hmsondakar@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "receipts",
+      "source": "./",
+      "description": "Make your coding agent show its work: a short receipt of what changed, which checks really ran, and what it assumed."
+    }
+  ]
+}

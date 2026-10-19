@@ -1,0 +1,26 @@
+{
+  "name": "show-receipts",
+  "version": "0.1.0",
+  "description": "Make AI coding agents show their work: a short receipt of what changed, which checks really ran, and what the agent assumed.",
+  "keywords": ["claude-code", "codex", "cursor", "ai", "agent", "code-review", "pull-request", "hooks", "verification"],
+  "license": "MIT",
+  "author": "Harshavardhan Sondakar <hmsondakar@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Harshavardhan-Sondakar/receipts.git"
+  },
+  "homepage": "https://github.com/Harshavardhan-Sondakar/receipts#readme",
+  "bugs": "https://github.com/Harshavardhan-Sondakar/receipts/issues",
+  "type": "module",
+  "bin": { "receipts": "bin/receipts.mjs" },
+  "files": ["bin", "lib", "skills", "hooks", ".claude-plugin", "README.md", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc -p jsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}

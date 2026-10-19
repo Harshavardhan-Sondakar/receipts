@@ -1,0 +1,10 @@
+{
+  "name": "receipts",
+  "version": "0.1.0",
+  "description": "Make your coding agent show its work: a short receipt of what changed, which checks really ran, and what it assumed.",
+  "author": { "name": "Harshavardhan Sondakar", "email": "hmsondakar@gmail.com" },
+  "homepage": "https://github.com/Harshavardhan-Sondakar/receipts",
+  "repository": "https://github.com/Harshavardhan-Sondakar/receipts",
+  "license": "MIT",
+  "keywords": ["review", "pull-request", "verification", "hooks"]
+}
