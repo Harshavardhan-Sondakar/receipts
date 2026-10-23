@@ -1,8 +1,21 @@
 {
   "name": "show-receipts",
-  "version": "0.1.2",
-  "description": "Make AI coding agents show their work: a short receipt of what changed, which checks really ran, and what the agent assumed.",
-  "keywords": ["claude-code", "codex", "cursor", "ai", "agent", "code-review", "pull-request", "hooks", "verification"],
+  "version": "0.2.0",
+  "description": "Your AI coding agent says it's done. Receipts checks that tests really ran, claims match what happened, and no TODOs, secrets or fake packages slipped in, then tells you the lines worth reviewing.",
+  "keywords": [
+    "agent",
+    "ai",
+    "claude-code",
+    "code-review",
+    "codex",
+    "cursor",
+    "hooks",
+    "pull-request",
+    "security",
+    "slopsquatting",
+    "typosquatting",
+    "verification"
+  ],
   "license": "MIT",
   "author": "Harshavardhan Sondakar <hmsondakar@gmail.com>",
   "repository": {
@@ -12,9 +25,21 @@
   "homepage": "https://github.com/Harshavardhan-Sondakar/receipts#readme",
   "bugs": "https://github.com/Harshavardhan-Sondakar/receipts/issues",
   "type": "module",
-  "bin": { "receipts": "bin/receipts.mjs" },
-  "files": ["bin", "lib", "skills", "hooks", ".claude-plugin", "README.md", "LICENSE"],
-  "engines": { "node": ">=20" },
+  "bin": {
+    "receipts": "bin/receipts.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "skills",
+    "hooks",
+    ".claude-plugin",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "typecheck": "tsc -p jsconfig.json"

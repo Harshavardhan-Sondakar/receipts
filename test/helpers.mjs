@@ -35,6 +35,9 @@ export function cli(cwd, args, input = '') {
   const env = { ...process.env }
   delete env.CLAUDE_PROJECT_DIR
   delete env.RECEIPTS_DIR
+  delete env.RECEIPTS_MODE
+  // never hit npm or PyPI from tests
+  env.RECEIPTS_OFFLINE = '1'
   const r = spawnSync('node', [CLI, ...args], { cwd, input, encoding: 'utf8', env })
   return { code: r.status, out: r.stdout, err: r.stderr }
 }
@@ -61,6 +64,7 @@ export function claude(dir, session = 's1') {
         tool_response: { stdout, stderr: '', interrupted: false },
         tool_use_id: 'x',
       }),
+    stop: (message = '', extra = {}) => send({ hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: message, ...extra }),
     fail: (command, error = 'Exit code 1') =>
       send({ hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', tool_input: { command }, tool_use_id: 'x', error }),
     send,

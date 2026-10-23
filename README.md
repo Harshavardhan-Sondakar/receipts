@@ -1,8 +1,82 @@
 # receipts
 
-Make your AI coding agent show its work.
+Your AI coding agent says "done, all tests pass". Receipts checks if that's true.
 
-When an agent says "done, all tests pass", you usually have to take its word for it, or scroll back through the session to check. Receipts records what the agent actually did and turns it into a short note you can read in 30 seconds or paste into a PR:
+It runs next to Claude Code, Codex or Cursor. When the agent tries to finish, Receipts looks at what really happened: which commands ran, what changed, what the agent claims. If something is off, the agent is sent back to fix it before you ever see it. When it's done, you get a short summary and know exactly which lines are worth your time.
+
+No AI is used for any of the checks. It's plain code, so it's fast (about 150 ms on a large repo) and costs no tokens unless there's something to fix.
+
+## What it catches
+
+**Work that isn't verified**
+- tests, typecheck or lint that never ran on the final code
+- checks that failed, or ran before the last change
+- results hidden by a pipe, like `npm test | tail` (the exit code is `tail`'s, not the tests')
+
+**Claims that don't match what happened**
+- "All tests pass" when they didn't run, failed, or ran on older code
+- "I added tests" when no test file changed
+- "Updated the README" when no doc changed
+- "No breaking changes" when an export or API route was removed
+- "No new dependencies" when one was added
+- "All 72 tests pass" when the last run had 70
+
+**Tricks to make things pass**
+- `.only` or `.skip` added to tests, or test files deleted
+- the expected value in a test changed (`toBe(3)` became `toBe(4)`)
+- assertions removed from tests
+- `@ts-ignore`, `# type: ignore`, `eslint-disable`
+
+**Unfinished work**
+- new `TODO` / `FIXME`, "not implemented" stubs
+- `debugger`, `breakpoint()`, leftover `console.log` / `print`
+- placeholder or fake data
+
+**Security**
+- API keys, tokens and passwords written into code
+- `.env` files or private keys added to the change
+- TLS checks turned off, CORS open to everyone, `eval`, SQL built from strings, raw HTML
+
+**Fake or risky packages**
+
+AI tools sometimes invent package names, and attackers register those names ("slopsquatting"). Every new dependency in `package.json`, `requirements.txt`, `pyproject.toml` or `go.mod` is checked:
+- doesn't exist on npm / PyPI
+- one letter away from a popular package but barely used (`lodahs` vs `lodash`)
+- published days ago, or almost no downloads
+
+**Things outside the task**
+- files edited outside the project, global installs, `curl | sh`, `sudo`
+- `git push --force`, `git reset --hard`, `--no-verify`, `npm publish`
+- deleted files, migrations that drop tables or columns
+- changes to auth, payments, CI, infrastructure
+
+**Breaking changes**
+- exported functions or API routes removed
+- a new environment variable that isn't in `.env.example`
+
+Things the agent can fix (missing checks, false claims, TODOs, secrets, test tricks, fake packages) send it back. The rest is shown to you as "worth a look".
+
+## What you see
+
+When the agent finishes, a summary appears in Claude Code. It's shown to you only, so it costs no tokens:
+
+```
+🧾 3 files changed · tests ✅ 72 · typecheck ✅ · lint ✅
+   ⚠️ Dependencies: 1 new dependency (`zod`)
+   👀 Review: read 12 lines in 1 file · skim 30 (tests) · skip 180 (lockfile, whitespace only) · start at src/limits.ts:22-33
+```
+
+If something's wrong, the agent gets a short note instead and keeps working:
+
+```
+Receipts: not done yet. Fix these, or tell the user why they're fine:
+- Lint never ran on these changes. Run `npm run lint`.
+- You said you added tests, but no test file has new lines. Make it true (run it or do it), or correct what you told the user.
+```
+
+Each problem sends the agent back at most once, and at most twice per task, so it can't get stuck in a loop.
+
+Ask "make a receipt" for the full version, ready to paste into a PR. A real one:
 
 ```markdown
 ## Receipt: Reject NaN for limits.fileSize
@@ -23,50 +97,64 @@ When an agent says "done, all tests pass", you usually have to take its word for
 - src/middleware.ts:41 new NaN guard placed before the negative check.
 ```
 
-That's a real receipt from a Claude Code session on [hono-file-upload](https://github.com/Harshavardhan-Sondakar/hono-file-upload), unedited apart from one line removed.
+That one is from a real Claude Code session on [hono-file-upload](https://github.com/Harshavardhan-Sondakar/hono-file-upload), made with an earlier version (today's version would also have sent the agent back to run typecheck and lint).
 
-The top half is evidence. It comes from what really happened, not from what the agent says happened, so a test that never ran shows up as never run, and a test that ran before the last edit shows up as stale.
+## Install
 
-The bottom half is the part only the agent knows: why it did it, what it assumed, what it skipped. That's exactly the stuff that's missing when you review AI-written code.
+You need Node.js 20+ and git 2.31+.
 
-## Install (Claude Code)
-
-```
-/plugin marketplace add Harshavardhan-Sondakar/receipts
-/plugin install receipts@receipts
-```
-
-Restart Claude Code, then work as usual. When a task is done, ask:
-
-> make a receipt
-
-The receipt is saved to `.receipts/latest.md` in your project. To use it as a PR description:
+### Claude Code
 
 ```sh
-gh pr create --body-file .receipts/latest.md
+claude plugin marketplace add Harshavardhan-Sondakar/receipts
+claude plugin install receipts@receipts
 ```
 
-You need Node.js 20 or newer and git 2.31 or newer.
+Restart Claude Code and work as usual. To update later: `claude plugin marketplace update receipts && claude plugin update receipts@receipts`.
 
-## How it works
+### Codex and Cursor (beta)
 
-1. **A hook records every command and file edit.** It's a small script that runs after each tool call and writes one line to `.receipts/log.jsonl`. It prints nothing, so it adds nothing to the agent's context and costs no tokens.
-2. **A script turns the log into facts.** It compares your project now with how it was when the session started, using git. That's how it knows which files changed (even ones changed by a shell command), which checks passed or failed, and whether the code changed after a check ran.
-3. **The agent adds a few lines.** Only the things a script can't know: why, assumptions, rejected options, what wasn't checked, where to look.
+From your project folder:
 
-### Red flags it looks for
+```sh
+npx show-receipts init codex    # or: init cursor   (add --global for all projects)
+```
 
-All of these are found by plain code, no AI:
+This adds hooks to `.codex/hooks.json` or `.cursor/hooks.json` (merged with what's there) and short receipt instructions to `AGENTS.md` or `.cursor/rules/`. Codex asks you to approve new hooks on its next start.
 
-- a test or check that ran before the last change (stale)
-- a check whose exit code was hidden by what ran after it (`npm test | tail`, `npm test || true`). Then only the test summary in the output counts
-- project checks that never ran (`test`, `lint`, `typecheck` from your `package.json`, or `cargo test`, `go test`, `pytest`)
-- `.only` or skipped tests, `@ts-ignore`, `eslint-disable` and similar in new lines
-- deleted test files, or lots of test lines removed
-- new dependencies (`package.json`, `requirements.txt`, `go.mod`)
-- changes to auth, env files, CI config, migrations or infrastructure
-- code changed but no test files touched
-- risky commands like `git push --force`, `git reset --hard`, `--no-verify`, `npm publish`
+These two are tested against their documented hook formats but haven't been through as many real sessions as Claude Code yet. Cursor doesn't report exit codes, so a check there counts as passed only when its output has a test summary. Please open an issue if something looks off.
+
+### In CI or before a commit
+
+```sh
+npx show-receipts check --base origin/main   # exit code 1 if something must be fixed
+npx show-receipts check --json               # for scripts
+```
+
+Without the agent's recording, CI can't know which checks ran, but everything else (secrets, test tricks, fake packages, TODOs, breaking changes, review map) works the same.
+
+## Settings
+
+Optional. Put them in `receipts.json` in your project, or under `"receipts"` in `package.json`:
+
+```json
+{
+  "mode": "enforce",
+  "require": ["test", "typecheck", "lint"],
+  "commands": { "test": "make verify" },
+  "ignore": ["unfinished:debug-print", "deps"],
+  "sensitive": ["src/billing/"],
+  "maxBlocks": 2,
+  "registry": true
+}
+```
+
+- `mode`: `enforce` sends the agent back, `warn` only tells you, `off` turns the stop check off. `RECEIPTS_MODE=warn` works too.
+- `require`: which checks must run on the final code (only the ones your project has).
+- `commands`: your own check commands, if they aren't `package.json` scripts.
+- `ignore`: finding ids (`tests:silenced-lint`), prefixes, or whole categories (`deps`, `security`, ...).
+- `sensitive`: extra paths to flag when changed.
+- `registry`: set to `false` to never look packages up online. `RECEIPTS_OFFLINE=1` does the same.
 
 ## Token cost
 
@@ -74,42 +162,30 @@ Measured with `claude plugin details`:
 
 | | tokens |
 |---|---|
-| Always loaded (the skill's one-line description) | ~72 |
-| Hooks | 0 (they never talk to the model) |
-| Making a receipt (skill instructions) | ~390 |
-| Facts the agent reads | ~100 to 300 |
-| What the agent writes | ~100 to 200 |
+| Always loaded (the skill's one-line description) | ~79 |
+| Recording commands and edits | 0 (hooks never talk to the model) |
+| The check when the agent stops | 0, unless it sends the agent back (~50–150 for the note) |
+| The summary you see | 0 (shown to you only) |
+| A full receipt, when you ask for one | ~400 for the instructions, plus ~300–500 for facts and the agent's notes |
 
-So roughly **700 tokens per receipt**, and nothing while the agent works. The main trick is that the agent never re-reads the diff or the conversation to write the receipt. The script already did that.
+The agent never re-reads the diff or the conversation for any of this. The script already has it.
 
 ## Privacy
 
-Everything stays on your machine in `.receipts/`, which ignores itself in git (it has its own `.gitignore`), so it never ends up in a commit.
+Everything stays on your machine in `.receipts/`, which ignores itself in git, so it never ends up in a commit.
 
-- Command output is never saved. Only the pass/fail result and test counts are kept.
+- Command output is never saved, only pass/fail and test counts.
 - Things that look like secrets in commands (`API_KEY=...`, `--token ...`, `Bearer ...`, `https://user:pass@...`, GitHub/npm/AWS/Slack tokens) are replaced with `***` before anything is written.
-- Your git staging area is never touched. Snapshots use a temporary index.
-
-## CLI
-
-The plugin uses these, but you can run them yourself too:
-
-```sh
-npx show-receipts facts   # what was recorded for the current task
-npx show-receipts show    # print the latest receipt
-```
-
-## Other agents
-
-Codex and Cursor both have hooks, and the recorder already understands their payloads, but they aren't packaged or tested yet. That's next. If you want to try it early, open an issue and I'll help you set it up.
-
-Cursor's shell hook doesn't report exit codes, so there receipts will show "ran" instead of "passed" or "failed" unless it can read test counts from the output.
+- Your git staging area is never touched.
+- The only network calls are package lookups on npm / PyPI for new dependencies, cached for a week. Turn them off with `"registry": false`.
 
 ## Limits
 
-- It knows what ran, not whether the tests are any good. A passing test suite with no real tests still passes.
-- Outside a git repo it can only list files changed through the agent's edit tool, and can't tell if a check is stale after shell edits.
-- If you install it in the middle of a session, the first task is compared with your last commit, so your own uncommitted changes may show up too. The receipt says so when this happens.
+- It knows what ran, not whether the tests are good. A test suite with no real tests still passes.
+- Claim checking reads plain English and looks for clear claims ("all tests pass", "added tests"). It ignores negations and instructions ("make sure tests pass"), and won't catch everything.
+- Checks look at lines, not code meaning, so a TODO inside a string counts and an export removed through a re-export might not.
+- Outside a git repo it can only list files changed through the agent's edit tool.
+- If you install it mid-session, the first task is compared with your last commit, so your own uncommitted changes may show up too. The receipt says so when this happens.
 
 ## License
 

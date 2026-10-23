@@ -147,12 +147,12 @@ describe('facts', () => {
     })
     agent.edit('src/x.ts')
     const f = facts(dir)
-    assert.match(f, /focused test \(\.only\)[^|]*test\/a\.test\.js:1/)
-    assert.match(f, /skipped test: test\/a\.test\.js:2/)
-    assert.match(f, /type error silenced: src\/x\.ts:1/)
-    assert.match(f, /new dependency: left-pad/)
-    assert.match(f, /auth \/ security changed: src\/auth\/login\.ts/)
-    assert.match(f, /CI config changed: \.github\/workflows\/ci\.yml/)
+    assert.match(f, /Focused test \(\.only\)[^\n]*\(test\/a\.test\.js:1\)/)
+    assert.match(f, /Test skipped \(test\/a\.test\.js:2\)/)
+    assert.match(f, /Type error silenced[^\n]*\(src\/x\.ts:1\)/)
+    assert.match(f, /1 new dependency \(`left-pad`\)/)
+    assert.match(f, /Auth \/ security code changed \(src\/auth\/login\.ts\)/)
+    assert.match(f, /CI config changed \(\.github\/workflows\/ci\.yml\)/)
   })
 
   it('flags deleted tests and code changed without tests', () => {
@@ -162,14 +162,14 @@ describe('facts', () => {
     sh(dir, 'git', 'rm', '-q', 'test/a.test.js')
     write(dir, { 'src/a.js': '2\n' })
     agent.ok('ls')
-    assert.match(facts(dir), /test file deleted: test\/a\.test\.js/)
+    assert.match(facts(dir), /Test file deleted \(test\/a\.test\.js\)/)
 
     const dir2 = makeRepo({ 'src/a.js': '1\n' })
     const agent2 = claude(dir2)
     agent2.start()
     write(dir2, { 'src/a.js': '2\n' })
     agent2.ok('ls')
-    assert.match(facts(dir2), /code changed but no test files changed/)
+    assert.match(facts(dir2), /Code changed but no tests were added or changed \(src\/a\.js\)/)
   })
 
   it('flags risky commands', () => {
@@ -180,9 +180,9 @@ describe('facts', () => {
     agent.ok('git commit --no-verify -m wip')
     agent.ok('rm -rf node_modules') // fine
     const f = facts(dir)
-    assert.match(f, /force push/)
+    assert.match(f, /Ran a risky command: Force push/)
     assert.match(f, /--no-verify/)
-    assert.doesNotMatch(f, /recursive delete/)
+    assert.doesNotMatch(f, /Recursive delete/)
   })
 
   it('points at the biggest changed regions with line numbers', () => {
