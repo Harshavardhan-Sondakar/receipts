@@ -1,6 +1,6 @@
 {
   "name": "show-receipts",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Make AI coding agents show their work: a short receipt of what changed, which checks really ran, and what the agent assumed.",
   "keywords": ["claude-code", "codex", "cursor", "ai", "agent", "code-review", "pull-request", "hooks", "verification"],
   "license": "MIT",

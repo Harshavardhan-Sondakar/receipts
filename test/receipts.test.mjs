@@ -354,4 +354,23 @@ describe('real world', () => {
     assert.match(md, /Self-reported\.\*\* .*compared with the last commit/)
     assert.match(md, /`src\/b\.ts` \(new\)/)
   })
+
+  it('does not trust the exit code when a check is piped into another command', () => {
+    const dir = makeRepo()
+    const agent = claude(dir)
+    agent.start()
+    write(dir, { 'src/a.ts': 'x\n' })
+    // tail succeeds even though tests failed
+    agent.ok('npm test 2>&1 | tail -30', ' Tests  2 failed | 70 passed (72)')
+    agent.ok('npx tsc --noEmit | head -20')
+    agent.ok('set -o pipefail; npm run lint | tail')
+    agent.ok('npm run build || true')
+    agent.ok('cd app && npm run typecheck && echo ok')
+    const f = facts(dir)
+    assert.match(f, /npm run build \|\| true: exit code hidden/)
+    assert.match(f, /npm run typecheck && echo ok: passed/)
+    assert.match(f, /npm test 2>&1 \| tail -30: failed \(70 passed, 2 failed\)/)
+    assert.match(f, /npx tsc --noEmit \| head -20: exit code hidden by a later command/)
+    assert.match(f, /npm run lint \| tail: passed/)
+  })
 })

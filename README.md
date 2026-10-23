@@ -5,24 +5,25 @@ Make your AI coding agent show its work.
 When an agent says "done, all tests pass", you usually have to take its word for it, or scroll back through the session to check. Receipts records what the agent actually did and turns it into a short note you can read in 30 seconds or paste into a PR:
 
 ```markdown
-## Receipt: add rate limiting to /login
+## Receipt: Reject NaN for limits.fileSize
 
-**Changed:** 3 files (+84 −12): `src/auth.ts`, `src/limits.ts` (new), `test/auth.test.ts`
+**Changed:** 2 files (+9 −0): `src/middleware.ts`, `test/middleware.test.ts`
 
 **Verified** (recorded, not claimed):
-- ✅ `npm test`: passed (42 passed)
-- ⚠️ `npm run typecheck`: passed, **but the code changed after it ran**
+- ✅ `npm test 2>&1 | tail -30`: passed (72 passed)
+- ⚠️ `npm run typecheck`: never run
 - ⚠️ `npm run lint`: never run
 
-**Why:** login had no limit, so password guessing was unlimited.
-**Assumed:** the app runs as one server, so the counter is kept in memory.
-**Rejected:** a Redis store, it adds a dependency for a single server.
-**Not checked:** how it behaves behind a proxy (IP detection).
+**Why:** NaN slipped past the `< 0` check, so an invalid fileSize was silently accepted.
+**Rejected:** Number.isFinite check, because Infinity may be a legitimate "no limit" value.
+**Not checked:**
+- Other limits (e.g. file count) may have the same NaN gap; I did not look.
 
 **Look closely at:**
-- src/limits.ts:22-40 (time window logic)
-- 🚩 auth / security changed: src/auth.ts
+- src/middleware.ts:41 new NaN guard placed before the negative check.
 ```
+
+That's a real receipt from a Claude Code session on [hono-file-upload](https://github.com/Harshavardhan-Sondakar/hono-file-upload), unedited apart from one line removed.
 
 The top half is evidence. It comes from what really happened, not from what the agent says happened, so a test that never ran shows up as never run, and a test that ran before the last edit shows up as stale.
 
@@ -58,6 +59,7 @@ You need Node.js 20 or newer and git 2.31 or newer.
 All of these are found by plain code, no AI:
 
 - a test or check that ran before the last change (stale)
+- a check whose exit code was hidden by what ran after it (`npm test | tail`, `npm test || true`). Then only the test summary in the output counts
 - project checks that never ran (`test`, `lint`, `typecheck` from your `package.json`, or `cargo test`, `go test`, `pytest`)
 - `.only` or skipped tests, `@ts-ignore`, `eslint-disable` and similar in new lines
 - deleted test files, or lots of test lines removed
