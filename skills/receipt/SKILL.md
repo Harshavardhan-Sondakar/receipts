@@ -3,13 +3,13 @@ name: receipt
 description: Write a short receipt of the work you just did, with recorded proof of which checks really ran. Use when finishing a coding task, before a commit or PR, or when asked for a receipt.
 ---
 
-Hooks already recorded the changes and commands. You add only what they can't know. The CLI is `../../bin/receipts.mjs` from this skill's folder.
+Hooks already recorded the changes and commands. You add only what they can't know. Run the CLI from the project folder (don't cd into the skill folder), using its full path: `<skill folder>/../../bin/receipts.mjs`.
 
-1. `node <skill folder>/../../bin/receipts.mjs facts` (don't repeat these, they're added for you)
+1. `node "<skill folder>/../../bin/receipts.mjs" facts` (don't repeat these, they're added for you)
 2. Write your part:
 
 ```sh
-node <skill folder>/../../bin/receipts.mjs write <<'EOF'
+node "<skill folder>/../../bin/receipts.mjs" write <<'EOF'
 title: <task in a few words>
 why: <the problem>
 assumed: <a guess that could be wrong>

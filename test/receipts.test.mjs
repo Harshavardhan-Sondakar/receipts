@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { describe, it } from 'node:test'
-import { claude, cli, makeRepo, sh, write } from './helpers.mjs'
+import { CLI, claude, cli, makeRepo, sh, write } from './helpers.mjs'
 
 const facts = (dir) => cli(dir, ['facts']).out
 
@@ -307,5 +307,51 @@ look at: src/limit.js:1 window logic
     cli(dir, ['write'], 'title: x\n')
     assert.equal(sh(dir, 'git', 'status', '--porcelain'), '')
     assert.ok(existsSync(join(dir, '.receipts', 'latest.md')))
+  })
+})
+
+// bugs found in the first real run inside Claude Code
+describe('real world', () => {
+  it('refuses to run from the receipts folder itself, instead of writing an empty receipt', () => {
+    const skillFolder = join(dirname(CLI), '..', 'skills', 'receipt')
+    const r = cli(skillFolder, ['facts'])
+    assert.equal(r.code, 2)
+    assert.match(r.err, /run this from your project folder/)
+    assert.equal(cli(skillFolder, ['write'], 'title: x\n').code, 2)
+    assert.ok(!existsSync(join(skillFolder, '.receipts')))
+  })
+
+  it('counts test runs started with package manager options or in a subshell', () => {
+    const dir = makeRepo()
+    const agent = claude(dir)
+    agent.start()
+    write(dir, { 'src/a.ts': 'x\n' })
+    agent.ok(`npm --prefix ${dir} test`)
+    agent.ok(`(cd ${dir} && pnpm -C . run lint)`)
+    const f = facts(dir)
+    assert.match(f, /npm --prefix \S+ test: passed/)
+    assert.match(f, /pnpm -C \. run lint\): passed/)
+  })
+
+  it('treats any command with a test summary in its output as a test run', () => {
+    const dir = makeRepo()
+    const agent = claude(dir)
+    agent.start()
+    write(dir, { 'src/a.ts': 'x\n' })
+    agent.ok('S=/some/path; P=/other; ./scripts/check.sh', ' Test Files  5 passed (5)\n      Tests  71 passed (71)')
+    assert.match(facts(dir), /check\.sh: passed \(71 passed\)/)
+  })
+
+  it('still lists changed files when nothing was recorded', () => {
+    const dir = makeRepo({ 'src/a.ts': '1\n' })
+    write(dir, { 'src/a.ts': '2\n', 'src/b.ts': 'new\n' })
+    const f = facts(dir)
+    assert.match(f, /Nothing was recorded/)
+    assert.match(f, /compared with the last commit/)
+    assert.match(f, /Changed 2 files/)
+    cli(dir, ['write'], 'title: x\nran: npm test, 3 passed\n')
+    const md = cli(dir, ['show']).out
+    assert.match(md, /Self-reported\.\*\* .*compared with the last commit/)
+    assert.match(md, /`src\/b\.ts` \(new\)/)
   })
 })

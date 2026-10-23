@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // @ts-check
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { collectFacts } from '../lib/facts.mjs'
 import { record } from '../lib/record.mjs'
 import { factsForAgent, parseNotes, renderReceipt } from '../lib/render.mjs'
@@ -28,6 +29,33 @@ function readStdin() {
 
 const [cmd] = process.argv.slice(2)
 
+// where receipts itself is installed
+const HOME = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '..'))
+
+/** @param {string} dir */
+const insideHome = (dir) => {
+  const real = realpathSync(dir)
+  return real === HOME || real.startsWith(HOME + sep)
+}
+
+/**
+ * The project the agent is working on. Run from inside the receipts folder
+ * (e.g. after `cd` into the skill folder) we'd look at the wrong place, so stop
+ * and say how to run it instead of quietly writing an empty receipt.
+ */
+function project() {
+  const root = projectRoot()
+  const fromEnv = process.env.RECEIPTS_DIR || process.env.CLAUDE_PROJECT_DIR
+  if (insideHome(root) || (!fromEnv && insideHome(process.cwd()))) {
+    console.error(
+      `receipts: run this from your project folder, not from where receipts is installed.\n` +
+        `For example: cd <your project> && node "${join(HOME, 'bin', 'receipts.mjs')}" ${cmd}`,
+    )
+    process.exit(2)
+  }
+  return root
+}
+
 switch (cmd) {
   case 'hook': {
     // a hook must never break the agent: no output, always exit 0
@@ -40,7 +68,7 @@ switch (cmd) {
   }
 
   case 'facts': {
-    const root = projectRoot()
+    const root = project()
     console.log(factsForAgent(collectFacts(root)))
     break
   }
@@ -50,7 +78,7 @@ switch (cmd) {
       console.error('receipts write reads notes from stdin, for example:\n  receipts write <<EOF\n  title: fix login\n  why: ...\n  EOF')
       process.exit(1)
     }
-    const root = projectRoot()
+    const root = project()
     const facts = collectFacts(root)
     const notes = parseNotes(readStdin())
     const now = new Date()
@@ -69,7 +97,7 @@ switch (cmd) {
   }
 
   case 'show': {
-    const file = join(projectRoot(), '.receipts', 'latest.md')
+    const file = join(project(), '.receipts', 'latest.md')
     if (!existsSync(file)) {
       console.error('No receipt yet. Ask your agent for one, or run "receipts write".')
       process.exit(1)
